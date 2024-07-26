@@ -11,8 +11,6 @@ services:
       - POSTGRES_DB=${DB_NAME}
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASS}
-    ports:
-      - "5432:5432"
 
   redis:
     image: "redis/redis-stack:latest"
@@ -31,18 +29,28 @@ services:
       - redis
       - db
 
-  web:
-    build: .
-    container_name: django_app
-    command: python manage.py runserver 0.0.0.0:8000
-    volumes:
-      - .:/app
+  app:
+    build:
+      context: .
+      args:
+        - DEV=true
     ports:
       - "8000:8000"
+    volumes:
+      - ./app:/app
+    command: >
+      sh -c "python manage.py wait_for_db &&
+             python manage.py migrate &&
+             gunicorn --bind 0.0.0.0:8000 --workers 3 config.wsgi:application"
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
     depends_on:
       - db
       - redis
-      - responder
+#      - responder
 
 volumes:
   postgres-data:
